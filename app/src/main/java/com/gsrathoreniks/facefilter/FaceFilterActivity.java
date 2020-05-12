@@ -10,12 +10,12 @@ import android.content.DialogInterface;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
-import android.graphics.Camera;
-import android.graphics.Color;
 import android.graphics.Matrix;
+import android.hardware.Camera;
 import android.os.Bundle;
 import android.os.Environment;
 import android.provider.MediaStore;
+import android.support.annotation.NonNull;
 import android.support.design.widget.Snackbar;
 import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AppCompatActivity;
@@ -38,6 +38,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.lang.reflect.Field;
 
 import static android.view.View.GONE;
 
@@ -237,28 +238,67 @@ public class FaceFilterActivity extends AppCompatActivity {
         ImageButton button = (ImageButton) findViewById(R.id.change);
         button.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
+                mPreview.release();
+                createCameraSource(CameraSource.CAMERA_FACING_FRONT);
+
+                try {
+                    mPreview.start(mCameraSource, mGraphicOverlay);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+//                mCameraSource.release();
+//                if (mCameraSource.getCameraFacing() == CameraSource.CAMERA_FACING_FRONT) {
+////                    changeCameraButton.setText("FRONT CAMERA");
+//                    if (mCameraSource != null) {
+//                        mCameraSource.release();
+//                    }
+//                    createCameraSource(CameraSource.CAMERA_FACING_BACK);
+//                } else {
+////                    changeCameraButton.setText("BACK CAMERA");
+//                    if (mCameraSource != null) {
+//                        mCameraSource.release();
+//                    }
+//                    createCameraSource(CameraSource.CAMERA_FACING_FRONT);
+//                }
             }
         });
 
         final ImageButton flash = (ImageButton) findViewById(R.id.flash);
         flash.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
-                int blue;
-                if(flashmode==false){
-                    flashmode = true;
-                    blue = 0;
-                }else{
-                    flashmode = false;
-                    blue = 255;
+                camera = getCamera(mCameraSource);
+                if (camera != null) {
+                    try {
+                        Camera.Parameters param = camera.getParameters();
+                        param.setFlashMode(!flashmode ? Camera.Parameters.FLASH_MODE_TORCH : Camera.Parameters.FLASH_MODE_OFF);
+                        camera.setParameters(param);
+                        flashmode = !flashmode;
+//                        if (flashmode) {
+//                            showToast("Flash Switched ON");
+//                        } else {
+//                            showToast("Flash Switched Off");
+//                        }
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+
                 }
-                flash.setColorFilter(Color.argb(255, 255, 255, blue));
+//                int blue;
+//                if(flashmode==false){
+//                    flashmode = true;
+//                    blue = 0;
+//                }else{
+//                    flashmode = false;
+//                    blue = 255;
+//                }
+//                flash.setColorFilter(Color.argb(255, 255, 255, blue));
             }
         });
 
         ImageButton camera = (ImageButton) findViewById(R.id.camera);
         camera.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
-                //takeImage();
+//                takeImage();
                 onPause();
             }
         });
@@ -267,7 +307,7 @@ public class FaceFilterActivity extends AppCompatActivity {
 
         int rc = ActivityCompat.checkSelfPermission(this, Manifest.permission.CAMERA);
         if (rc == PackageManager.PERMISSION_GRANTED) {
-            createCameraSource();
+            createCameraSource(CameraSource.CAMERA_FACING_BACK);
         } else {
             requestCameraPermission();
         }
@@ -282,6 +322,9 @@ public class FaceFilterActivity extends AppCompatActivity {
                 @Override
                 public void onPictureTaken(byte[] bytes) {
                     try {
+                        if(bytes==null){
+                            Log.d(TAG, "onPictureTaken: nulllll");
+                        }
                         // convert byte array into bitmap
                         Bitmap loadedImage = null;
                         Bitmap rotatedBitmap = null;
@@ -342,6 +385,7 @@ public class FaceFilterActivity extends AppCompatActivity {
                         setResult(Activity.RESULT_OK); //add this
                         finish();
                     } catch (Exception e) {
+                        Log.d(TAG, "onPictureTaken: catched");
                         e.printStackTrace();
                     }
                 }
@@ -402,7 +446,7 @@ public class FaceFilterActivity extends AppCompatActivity {
     }
 
 
-    private void createCameraSource() {
+    private void createCameraSource(int cameraFacing) {
 
         Context context = getApplicationContext();
         FaceDetector detector = new FaceDetector.Builder(context)
@@ -428,13 +472,17 @@ public class FaceFilterActivity extends AppCompatActivity {
             // download completes on device.
             Log.w(TAG, "Face detector dependencies are not yet available.");
         }
-
+//        if(mCameraSource!=null){
+//            mCameraSource.release();
+//        }
         mCameraSource = new CameraSource.Builder(context, detector)
                 .setRequestedPreviewSize(640, 480)
                 .setAutoFocusEnabled(true)
-                .setFacing(CameraSource.CAMERA_FACING_BACK)
+                .setFacing(cameraFacing)
                 .setRequestedFps(30.0f)
                 .build();
+
+
         //observer.start();
         /*
         TextGraphic mTextGraphic = new TextGraphic(mGraphicOverlay);
@@ -450,7 +498,26 @@ public class FaceFilterActivity extends AppCompatActivity {
         startCameraSource();
     }
 
+    private static Camera getCamera(@NonNull CameraSource cameraSource) {
+        Field[] declaredFields = CameraSource.class.getDeclaredFields();
 
+        for (Field field : declaredFields) {
+            if (field.getType() == Camera.class) {
+                field.setAccessible(true);
+                try {
+                    Camera camera = (Camera) field.get(cameraSource);
+                    if (camera != null) {
+                        return camera;
+                    }
+                    return null;
+                } catch (IllegalAccessException e) {
+                    e.printStackTrace();
+                }
+                break;
+            }
+        }
+        return null;
+    }
     @Override
     protected void onPause() {
         super.onPause();
@@ -478,7 +545,7 @@ public class FaceFilterActivity extends AppCompatActivity {
         if (grantResults.length != 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
             Log.d(TAG, "Camera permission granted - initialize the camera source");
             // we have permission, so create the camerasource
-            createCameraSource();
+            createCameraSource(CameraSource.CAMERA_FACING_BACK);
             return;
         }
 

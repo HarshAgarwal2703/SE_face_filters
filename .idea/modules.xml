@@ -3,6 +3,8 @@
   <component name="ProjectModuleManager">
     <modules>
       <module fileurl="file://$PROJECT_DIR$/Android-face-filters-master.iml" filepath="$PROJECT_DIR$/Android-face-filters-master.iml" group="Android-face-filters-master" />
+      <module fileurl="file://$PROJECT_DIR$/SE_face_filters.iml" filepath="$PROJECT_DIR$/SE_face_filters.iml" group="SE_face_filters" />
+      <module fileurl="file://$PROJECT_DIR$/app/SE_face_filters-app.iml" filepath="$PROJECT_DIR$/app/SE_face_filters-app.iml" group="SE_face_filters/app" />
       <module fileurl="file://$PROJECT_DIR$/app/app.iml" filepath="$PROJECT_DIR$/app/app.iml" group="Android-face-filters-master/app" />
     </modules>
   </component>
